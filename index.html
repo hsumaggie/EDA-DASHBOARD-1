@@ -192,9 +192,9 @@
                                 <th class="py-4 px-6 text-center">Borrow Risk</th>
                                 <th class="py-4 px-6">Tool Name</th>
                                 <th class="py-4 px-6 text-center">Formal license quantity</th>
-                                <th class="py-4 px-6 text-center">Temp license quantity</th>
+                                <th class="py-4 px-6 text-center">Average Temp license quantity</th>
                                 <th class="py-4 px-6 text-center">Borrow Rate %</th>
-                                <th class="py-4 px-6 text-center">Borrow Duration (Days)</th>
+                                <th class="py-4 px-6 text-center">Borrow Duration (Weeks)</th>
                                 <th class="py-4 px-6">Category</th>
                                 <th class="py-4 px-6">Function</th>
                                 <th class="py-4 px-6">TML</th>
@@ -673,9 +673,9 @@
                                 <td class="py-4 px-6 text-center">${riskBadge}</td>
                                 <td class="py-4 px-6 font-semibold text-slate-800">${item.tool}</td>
                                 <td class="py-4 px-6 text-center font-mono font-medium">${item.formalQty}</td>
-                                <td class="py-4 px-6 text-center font-mono font-medium text-blue-600">${item.tempQty}</td>
+                                <td class="py-4 px-6 text-center font-mono font-medium text-blue-600">${Math.round(item.tempQty)}</td>
                                 <td class="py-4 px-6 text-center font-mono font-bold ${isRisk ? 'text-rose-600' : 'text-slate-700'}">${borrowRate}%</td>
-                                <td class="py-4 px-6 text-center font-mono">${item.borrowDuration}</td>
+                                <td class="py-4 px-6 text-center font-mono">${Math.round(item.borrowDuration/7)}</td>
                                 <td class="py-4 px-6 text-slate-500">${item.category}</td>
                                 <td class="py-4 px-6 text-slate-500">${item.function}</td>
                                 <td class="py-4 px-6 font-bold text-slate-700">${item.tml}</td>
