@@ -94,8 +94,15 @@
                 </div>
 
                 <div class="flex items-center space-x-4 text-xs">
+                    <span class="text-slate-400 font-semibold">Borrow Risk 曝險評級：</span>
                     <span class="flex items-center text-slate-600">
-                        <span class="w-3 h-3 rounded-full bg-rose-500 mr-1.5 animate-pulse-red"></span> Borrow Rate 過高 ( ＞ 20% )
+                        <span class="w-3 h-3 rounded-full bg-rose-500 mr-1.5 animate-pulse-red"></span> 高風險
+                    </span>
+                    <span class="flex items-center text-slate-600">
+                        <span class="w-3 h-3 rounded-full bg-amber-500 mr-1.5"></span> 中風險
+                    </span>
+                    <span class="flex items-center text-slate-600">
+                        <span class="w-3 h-3 rounded-full bg-emerald-500 mr-1.5"></span> 低風險
                     </span>
                 </div>
             </div>
@@ -619,20 +626,35 @@
             return id;
         };
 
-        // 100% 相容之第一層 Borrow Risk 評估 (不含 ES6 .some 迴圈)
-        window.getBorrowRiskStatus = function(vendorId) {
+        // 第一層 Borrow Risk 評級：採用與第二層明細相同的曝險評級 (Risk Score) 公式，
+        // 取該廠商工具清單中分數最高者代表整體風險，讓長官在第一層就能看出高／中／低風險
+        window.getVendorRiskScoreInfo = function(vendorId) {
             var activeYearData = yearlyData[state.filterYear];
-            if (!activeYearData || !activeYearData.tempKey) return 'Sufficient';
-            var tempKeyData = activeYearData.tempKey[vendorId] || [];
-            if (tempKeyData.length === 0) return 'Sufficient'; 
-            
-            for (var i = 0; i < tempKeyData.length; i++) {
-                var item = tempKeyData[i];
-                if ((item.tempQty / item.formalQty) >= 0.2) {
-                    return 'At Risk';
-                }
+            if (!activeYearData || !activeYearData.tempKey) return null;
+            var data = activeYearData.tempKey[vendorId] || [];
+            if (data.length === 0) return null;
+
+            var minCost = null, maxCost = null, maxRate = 0;
+            for (var c = 0; c < data.length; c++) {
+                var rate = (data[c].tempQty / data[c].formalQty) * 100;
+                if (rate > maxRate) maxRate = rate;
+                if (minCost === null || data[c].cost < minCost) minCost = data[c].cost;
+                if (maxCost === null || data[c].cost > maxCost) maxCost = data[c].cost;
             }
-            return 'Sufficient';
+            var rateNormCap = Math.max(maxRate, 100);
+
+            var maxScore = 0;
+            for (var i = 0; i < data.length; i++) {
+                var item = data[i];
+                var rate = (item.tempQty / item.formalQty) * 100;
+                var normRate = rateNormCap > 0 ? Math.min((rate / rateNormCap) * 100, 100) : 0;
+                var normCost = (maxCost === minCost) ? 50 : ((item.cost - minCost) / (maxCost - minCost)) * 100;
+                var score = Math.round(0.5 * normRate + 0.5 * normCost);
+                if (score > maxScore) maxScore = score;
+            }
+
+            var level = maxScore >= 70 ? 'High' : (maxScore >= 40 ? 'Medium' : 'Low');
+            return { score: maxScore, level: level };
         };
 
         // ==================== 2. 所有全域導航與第二層資料渲染控制 (100% 純原生 for 迴圈) ====================
@@ -1112,15 +1134,29 @@
                             ? '<td class="py-4 px-6 text-right font-mono text-slate-400">$0</td>'
                             : `<td class="py-4 px-6 text-right font-mono text-blue-600 hover:underline cursor-pointer" onclick="window.showLevel2A('${item.id}')">$${item.temp.toLocaleString()} ↗</td>`;
 
-                        // Borrow Risk
+                        // Borrow Risk：依第二層曝險評級 (Risk Score) 的最高分數，顯示高／中／低風險，方便長官在第一層即可分辨並點選展開細節
                         var borrowRiskCellHtml = '<td class="py-4 px-6 text-center text-slate-400">-</td>';
                         if (item.type === 'Software') {
-                            var bRisk = window.getBorrowRiskStatus(item.id);
-                            if (bRisk === 'At Risk') {
+                            var riskInfo = window.getVendorRiskScoreInfo(item.id);
+                            if (riskInfo && riskInfo.level === 'High') {
                                 borrowRiskCellHtml = `
                                     <td class="py-4 px-6 text-center cursor-pointer" onclick="window.showLevel2A('${item.id}')">
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 hover:underline">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse-red mr-1"></span>At Risk ↗
+                                            <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse-red mr-1"></span>高風險 (${riskInfo.score}) ↗
+                                        </span>
+                                    </td>`;
+                            } else if (riskInfo && riskInfo.level === 'Medium') {
+                                borrowRiskCellHtml = `
+                                    <td class="py-4 px-6 text-center cursor-pointer" onclick="window.showLevel2A('${item.id}')">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800 hover:underline">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1"></span>中風險 (${riskInfo.score}) ↗
+                                        </span>
+                                    </td>`;
+                            } else if (riskInfo) {
+                                borrowRiskCellHtml = `
+                                    <td class="py-4 px-6 text-center cursor-pointer" onclick="window.showLevel2A('${item.id}')">
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 hover:underline">
+                                            低風險 (${riskInfo.score}) ↗
                                         </span>
                                     </td>`;
                             } else {
