@@ -176,6 +176,9 @@
                     <p class="text-sm text-slate-500 mt-1">
                         Borrow Rate % = 當年度 Temp 數量 / 當年度 Formal 數量。若大於或等於 <span class="font-bold text-rose-600">20%</span>，將亮起「At Risk」警示燈。
                     </p>
+                    <p class="text-xs text-slate-400 mt-1">
+                        曝險評級 (Risk Score)：將 Borrow Rate % 與 Temp key cost 兩項指標各自正規化 (Min-Max Normalization) 至 0–100 分後加權平均（Weighted Sum Model / Simple Additive Weighting, SAW），综合反映「授權吃緊程度」與「財務曝險金額」。分數 <span class="font-bold text-rose-600">≥ 70</span> 為高風險、<span class="font-bold text-amber-600">40–69</span> 為中風險、<span class="font-bold text-emerald-600">&lt; 40</span> 為低風險（同一供應商工具清單內比較）。
+                    </p>
                 </div>
                 <button class="bg-brand-800 hover:bg-brand-900 text-white text-sm px-4 py-2 rounded-lg transition" onclick="window.showLevel1()">
                     ← 返回總覽
@@ -199,6 +202,7 @@
                                 <th class="py-4 px-6">Function</th>
                                 <th class="py-4 px-6">TML</th>
                                 <th class="py-4 px-6 text-right">Temp key cost $</th>
+                                <th class="py-4 px-6 text-center">曝險評級 (Risk Score)</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 text-sm" id="temp-key-detail-rows"></tbody>
@@ -248,8 +252,9 @@
                 <table class="w-full text-left border-collapse">
                     <thead>
                         <tr class="bg-slate-100 text-slate-600 text-xs font-semibold uppercase">
-                            <th class="py-4 px-6">時期/季度</th>
+                            <th class="py-4 px-6">Deal Period</th>
                             <th class="py-4 px-6">採購項目 / 合約名稱</th>
+                            <th class="py-4 px-6">PR#</th>
                             <th class="py-4 px-6 text-right">細項需求金額 (Demand)</th>
                             <th class="py-4 px-6 text-right">細項預算金額 (Budget)</th>
                             <th class="py-4 px-6 text-right">細項實際花費 (Spending)</th>
@@ -265,8 +270,8 @@
         <div id="level2d-dashboard" class="hidden space-y-6">
             <div class="flex justify-between items-center">
                 <div>
-                    <h2 class="text-2xl font-bold text-slate-800">採購履行風險追蹤資訊 <span id="selected-vendor-title-d" class="text-rose-600"></span> (<span class="selected-year-span text-rose-600 font-bold"></span>年度)</h2>
-                    <p class="text-sm text-slate-500 mt-1">採購 Lead Time ＝ 專案需求日期 － 確認採購需求日期。若前置天數小於 <span class="font-bold text-rose-600">60 天</span>，系統將自動判定標示為「At Risk」。</p>
+                    <h2 class="text-2xl font-bold text-slate-800">採購履行風險追蹤資訊 <span id="selected-vendor-title-d" class="text-rose-600"></span><span id="level2d-type-label" class="text-slate-500 font-semibold"></span> (<span class="selected-year-span text-rose-600 font-bold"></span>年度)</h2>
+                    <p class="text-sm text-slate-500 mt-1" id="level2d-lead-time-desc">採購 Lead Time ＝ 專案需求日期 － 確認採購需求日期。若前置天數小於 <span class="font-bold text-rose-600">60 天</span>，系統將自動判定標示為「At Risk」。</p>
                 </div>
                 <button class="bg-brand-800 hover:bg-brand-900 text-white text-sm px-4 py-2 rounded-lg transition" onclick="window.showLevel1()">
                     ← 返回總覽
@@ -309,6 +314,18 @@
             if (isNaN(t1) || isNaN(t2)) return 0; 
             const diffTime = Math.abs(t2 - t1);
             return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        }
+
+        // 採購履行風險前置天數門檻：硬體 90 天，軟體／維護 60 天
+        function getLeadTimeThreshold(type) {
+            return type === 'Hardware' ? 90 : 60;
+        }
+
+        // 類型中文字樣：軟體 / 硬體 / 維護
+        function getTypeLabelZh(type) {
+            if (type === 'Hardware') return '硬體';
+            if (type === 'Hardware Maintenance') return '維護';
+            return '軟體';
         }
 
         // ==================== 全方位時空資料庫 ====================
@@ -354,44 +371,63 @@
                 },
                 fulfillmentRisk: {
                     "Synopsys_HW": [
-                        { product: "HPC Processing Server Rack", bu: "CPU Design BU", tml: "CW Ko", project: "N3P Alpha Project", confirmDate: "2026/01/10", targetDate: "2026/03/20", verifyDate: "2026/03/25" }, 
-                        { product: "In-Circuit Emulator Box", bu: "GPU Verification BU", tml: "CC Mao", project: "N2 Ultra Project", confirmDate: "2026/02/01", targetDate: "2026/03/15", verifyDate: "2026/03/18" } 
+                        { product: "HPC Processing Server Rack", bu: "CPU Design BU", tml: "CW Ko", project: "N3P Alpha Project", confirmDate: "2026/01/10", targetDate: "2026/03/20", verifyDate: "2026/03/25" },
+                        { product: "In-Circuit Emulator Box", bu: "GPU Verification BU", tml: "CC Mao", project: "N2 Ultra Project", confirmDate: "2026/02/01", targetDate: "2026/03/15", verifyDate: "2026/03/18" }
                     ],
                     "Cadence_HW": [
                         { product: "Palladium Z2 Emulator Chassis", bu: "AI Compute Platform BU", tml: "George Chien", project: "Tensor Gen2 Project", confirmDate: "2026/02/12", targetDate: "2026/02/24", verifyDate: "2026/03/05" },
                         { product: "Protium S1 Hardware System", bu: "AI Compute Platform BU", tml: "CM Chen", project: "Project Thor", confirmDate: "2026/01/10", targetDate: "2026/03/15", verifyDate: "2026/03/20" }
+                    ],
+                    "Synopsys_SW": [
+                        { product: "VCS Simulator Ultra 授權展期", bu: "CPU Design BU", tml: "CW Ko", project: "N3P Alpha Project", confirmDate: "2026/01/05", targetDate: "2026/02/20", verifyDate: "2026/02/25" },
+                        { product: "Fusion Design Platform Upgrade 導入", bu: "Design Platform BU", tml: "CM Chen", project: "Fusion Design Platform Upgrade", confirmDate: "2026/01/01", targetDate: "2026/04/05", verifyDate: "2026/04/10" }
+                    ],
+                    "Synopsys_Maint": [
+                        { product: "Synopsys Hardware Maintenance Contract 續約", bu: "IT Infra BU", tml: "CW Ko", project: "Annual Maintenance Renewal", confirmDate: "2026/01/10", targetDate: "2026/02/15", verifyDate: "2026/02/20" }
+                    ],
+                    "Cadence_SW": [
+                        { product: "Innovus Implementation System 授權展期", bu: "AI Compute Platform BU", tml: "CM Chen", project: "Digital Design Platform Subscription", confirmDate: "2026/01/15", targetDate: "2026/04/01", verifyDate: "2026/04/06" }
+                    ],
+                    "Siemens_SW": [
+                        { product: "Calibre nmDRC/LVS 授權展期", bu: "Verification BU", tml: "George Chien", project: "Calibre Physical Verification Maintenance", confirmDate: "2026/01/05", targetDate: "2026/02/18", verifyDate: "2026/02/23" }
+                    ],
+                    "Ansys_SW": [
+                        { product: "RedHawk-SC Power Integrity 授權展期", bu: "Power Integrity BU", tml: "CM Chen", project: "RedHawk-SC Power Integrity Licenses", confirmDate: "2026/01/10", targetDate: "2026/03/20", verifyDate: "2026/03/25" }
+                    ],
+                    "Keysight_SW": [
+                        { product: "High-Freq Analyzer Calibration 授權展期", bu: "RF Design BU", tml: "N/A", project: "High-Freq Analyzer Calibration Maintenance", confirmDate: "2026/01/20", targetDate: "2026/02/25", verifyDate: "2026/03/02" }
                     ]
                 },
                 spendBreakdown: {
                     "Synopsys_SW": [
-                        { period: "2026 Q1", item: "TLA Core IP Renewal", budget: 3000000, demand: 3000000, spending: 2900000 },
-                        { period: "2026 Q2", item: "AI-Driven Compiler Add-on", budget: 1200000, demand: 1300000, spending: 1200000 },
-                        { period: "2026 Q3", item: "Fusion Design Platform Upgrade", budget: 800000, demand: 900000, spending: 700000 }
+                        { pr: "PR-2026-001", dealStart: "2026/01/01", dealEnd: "2026/03/31", item: "TLA Core IP Renewal", budget: 3000000, demand: 3000000, spending: 2900000 },
+                        { pr: "PR-2026-002", dealStart: "2026/04/01", dealEnd: "2026/06/30", item: "AI-Driven Compiler Add-on", budget: 1200000, demand: 1300000, spending: 1200000 },
+                        { pr: "PR-2026-003", dealStart: "2026/07/01", dealEnd: "2026/09/30", item: "Fusion Design Platform Upgrade", budget: 800000, demand: 900000, spending: 700000 }
                     ],
                     "Synopsys_HW": [
-                        { period: "2026 Q1", item: "HPC Processing Server Nodes for Simulation Farm", budget: 1000000, demand: 1000000, spending: 950000 }
+                        { pr: "PR-2026-004", dealStart: "2026/01/20", dealEnd: null, item: "HPC Processing Server Nodes for Simulation Farm", budget: 1000000, demand: 1000000, spending: 950000 }
                     ],
                     "Synopsys_Maint": [
-                        { period: "2026 H1-H2", item: "Synopsys Hardware Maintenance Contract", budget: 500000, demand: 500000, spending: 480000 }
+                        { pr: "PR-2026-005", dealStart: "2026/01/01", dealEnd: "2026/12/31", item: "Synopsys Hardware Maintenance Contract", budget: 500000, demand: 500000, spending: 480000 }
                     ],
                     "Cadence_SW": [
-                        { period: "2026 Q1", item: "Digital Design Platform Subscription", budget: 2500000, demand: 2500000, spending: 2450000 },
-                        { period: "2026 Q2", item: "Spectre Verification Suite Expansion", budget: 1200000, demand: 1300000, spending: 1200000 },
-                        { period: "2026 Q3", item: "Cerebrus AI Optimization Tool Suite", budget: 800000, demand: 800000, spending: 750000 }
+                        { pr: "PR-2026-006", dealStart: "2026/01/01", dealEnd: "2026/03/31", item: "Digital Design Platform Subscription", budget: 2500000, demand: 2500000, spending: 2450000 },
+                        { pr: "PR-2026-007", dealStart: "2026/04/01", dealEnd: "2026/06/30", item: "Spectre Verification Suite Expansion", budget: 1200000, demand: 1300000, spending: 1200000 },
+                        { pr: "PR-2026-008", dealStart: "2026/07/01", dealEnd: "2026/09/30", item: "Cerebrus AI Optimization Tool Suite", budget: 800000, demand: 800000, spending: 750000 }
                     ],
                     "Cadence_HW": [
-                        { period: "2026 Q1-Emergency", item: "Palladium Emulation System Expansion", budget: 100000, demand: 250000, spending: 240000 },
-                        { period: "2026 Q3-Emergency", item: "Protium S1 Hardware Core Integration", budget: 50000, demand: 150000, spending: 140000 }
+                        { pr: "PR-2026-009", dealStart: "2026/02/15", dealEnd: null, item: "Palladium Emulation System Expansion", budget: 100000, demand: 250000, spending: 240000 },
+                        { pr: "PR-2026-010", dealStart: "2026/08/10", dealEnd: null, item: "Protium S1 Hardware Core Integration", budget: 50000, demand: 150000, spending: 140000 }
                     ],
                     "Siemens_SW": [
-                        { period: "2026 H1", item: "Calibre Physical Verification Maintenance", budget: 1500000, demand: 1500000, spending: 1450000 },
-                        { period: "2026 H2", item: "Tessent Test Suite Floating Licenses", budget: 500000, demand: 600000, spending: 500000 }
+                        { pr: "PR-2026-011", dealStart: "2026/01/01", dealEnd: "2026/06/30", item: "Calibre Physical Verification Maintenance", budget: 1500000, demand: 1500000, spending: 1450000 },
+                        { pr: "PR-2026-012", dealStart: "2026/07/01", dealEnd: "2026/12/31", item: "Tessent Test Suite Floating Licenses", budget: 500000, demand: 600000, spending: 500000 }
                     ],
                     "Ansys_SW": [
-                        { period: "2026 Full-Year", item: "RedHawk-SC Power Integrity Licenses", budget: 800000, demand: 900000, spending: 860000 }
+                        { pr: "PR-2026-013", dealStart: "2026/01/01", dealEnd: "2026/12/31", item: "RedHawk-SC Power Integrity Licenses", budget: 800000, demand: 900000, spending: 860000 }
                     ],
                     "Keysight_SW": [
-                        { period: "2026 Q1-Emergency", item: "High-Freq Analyzer Calibration Maintenance", budget: 100000, demand: 120000, spending: 110000 }
+                        { pr: "PR-2026-014", dealStart: "2026/01/20", dealEnd: "2026/03/31", item: "High-Freq Analyzer Calibration Maintenance", budget: 100000, demand: 120000, spending: 110000 }
                     ]
                 }
             },
@@ -440,34 +476,34 @@
                 },
                 spendBreakdown: {
                     "Synopsys_SW": [
-                        { period: "2027 Q1", item: "TLA Core IP Renewal", budget: 3200000, demand: 3200000, spending: 3100000 },
-                        { period: "2027 Q2", item: "AI-Driven Compiler Add-on", budget: 1200000, demand: 1300000, spending: 1200000 },
-                        { period: "2027 Q3", item: "Fusion Design Platform Upgrade", budget: 800000, demand: 900000, spending: 800000 }
+                        { pr: "PR-2027-001", dealStart: "2027/01/01", dealEnd: "2027/03/31", item: "TLA Core IP Renewal", budget: 3200000, demand: 3200000, spending: 3100000 },
+                        { pr: "PR-2027-002", dealStart: "2027/04/01", dealEnd: "2027/06/30", item: "AI-Driven Compiler Add-on", budget: 1200000, demand: 1300000, spending: 1200000 },
+                        { pr: "PR-2027-003", dealStart: "2027/07/01", dealEnd: "2027/09/30", item: "Fusion Design Platform Upgrade", budget: 800000, demand: 900000, spending: 800000 }
                     ],
                     "Synopsys_HW": [
-                        { period: "2027 Q1", item: "HPC Processing Server Nodes for Simulation Farm", budget: 1100000, demand: 1100000, spending: 1050000 }
+                        { pr: "PR-2027-004", dealStart: "2027/01/20", dealEnd: null, item: "HPC Processing Server Nodes for Simulation Farm", budget: 1100000, demand: 1100000, spending: 1050000 }
                     ],
                     "Synopsys_Maint": [
-                        { period: "2027 H1-H2", item: "Synopsys Hardware Maintenance Contract", budget: 550000, demand: 550000, spending: 530000 }
+                        { pr: "PR-2027-005", dealStart: "2027/01/01", dealEnd: "2027/12/31", item: "Synopsys Hardware Maintenance Contract", budget: 550000, demand: 550000, spending: 530000 }
                     ],
                     "Cadence_SW": [
-                        { period: "2027 Q1", item: "Digital Design Platform Subscription", budget: 2800000, demand: 2800000, spending: 2750000 },
-                        { period: "2027 Q2", item: "Spectre Verification Suite Expansion", budget: 1200000, demand: 1300000, spending: 1200000 },
-                        { period: "2027 Q3", item: "Cerebrus AI Optimization Tool Suite", budget: 800000, demand: 800000, spending: 750000 }
+                        { pr: "PR-2027-006", dealStart: "2027/01/01", dealEnd: "2027/03/31", item: "Digital Design Platform Subscription", budget: 2800000, demand: 2800000, spending: 2750000 },
+                        { pr: "PR-2027-007", dealStart: "2027/04/01", dealEnd: "2027/06/30", item: "Spectre Verification Suite Expansion", budget: 1200000, demand: 1300000, spending: 1200000 },
+                        { pr: "PR-2027-008", dealStart: "2027/07/01", dealEnd: "2027/09/30", item: "Cerebrus AI Optimization Tool Suite", budget: 800000, demand: 800000, spending: 750000 }
                     ],
                     "Cadence_HW": [
-                        { period: "2027 Q1-Emergency", item: "Palladium Emulation System Expansion", budget: 100000, demand: 200000, spending: 190000 },
-                        { period: "2027 Q3-Emergency", item: "Protium S1 Hardware Core Integration", budget: 100000, demand: 150000, spending: 150000 }
+                        { pr: "PR-2027-009", dealStart: "2027/02/15", dealEnd: null, item: "Palladium Emulation System Expansion", budget: 100000, demand: 200000, spending: 190000 },
+                        { pr: "PR-2027-010", dealStart: "2027/08/10", dealEnd: null, item: "Protium S1 Hardware Core Integration", budget: 100000, demand: 150000, spending: 150000 }
                     ],
                     "Siemens_SW": [
-                        { period: "2027 H1", item: "Calibre Physical Verification Maintenance", budget: 1600000, demand: 1600000, spending: 1550000 },
-                        { period: "2027 H2", item: "Tessent Test Suite Floating Licenses", budget: 600000, demand: 600000, spending: 550000 }
+                        { pr: "PR-2027-011", dealStart: "2027/01/01", dealEnd: "2027/06/30", item: "Calibre Physical Verification Maintenance", budget: 1600000, demand: 1600000, spending: 1550000 },
+                        { pr: "PR-2027-012", dealStart: "2027/07/01", dealEnd: "2027/12/31", item: "Tessent Test Suite Floating Licenses", budget: 600000, demand: 600000, spending: 550000 }
                     ],
                     "Ansys_SW": [
-                        { period: "2027 Full-Year", item: "RedHawk-SC Power Integrity Licenses", budget: 900000, demand: 950000, spending: 920000 }
+                        { pr: "PR-2027-013", dealStart: "2027/01/01", dealEnd: "2027/12/31", item: "RedHawk-SC Power Integrity Licenses", budget: 900000, demand: 950000, spending: 920000 }
                     ],
                     "Keysight_SW": [
-                        { period: "2027 Q1-Emergency", item: "High-Freq Analyzer Calibration Maintenance", budget: 120000, demand: 130000, spending: 120000 }
+                        { pr: "PR-2027-014", dealStart: "2027/01/20", dealEnd: "2027/03/31", item: "High-Freq Analyzer Calibration Maintenance", budget: 120000, demand: 130000, spending: 120000 }
                     ]
                 }
             },
@@ -514,34 +550,34 @@
                 },
                 spendBreakdown: {
                     "Synopsys_SW": [
-                        { period: "2028 Q1", item: "TLA Core IP Renewal", budget: 3500000, demand: 3500000, spending: 3400000 },
-                        { period: "2028 Q2", item: "AI-Driven Compiler Add-on", budget: 1200000, demand: 1200000, spending: 1150000 },
-                        { period: "2028 Q3", item: "Fusion Design Platform Upgrade", budget: 800000, demand: 800000, spending: 750000 }
+                        { pr: "PR-2028-001", dealStart: "2028/01/01", dealEnd: "2028/03/31", item: "TLA Core IP Renewal", budget: 3500000, demand: 3500000, spending: 3400000 },
+                        { pr: "PR-2028-002", dealStart: "2028/04/01", dealEnd: "2028/06/30", item: "AI-Driven Compiler Add-on", budget: 1200000, demand: 1200000, spending: 1150000 },
+                        { pr: "PR-2028-003", dealStart: "2028/07/01", dealEnd: "2028/09/30", item: "Fusion Design Platform Upgrade", budget: 800000, demand: 800000, spending: 750000 }
                     ],
                     "Synopsys_HW": [
-                        { period: "2028 Q1", item: "HPC Processing Server Nodes for Simulation Farm", budget: 1200000, demand: 1200000, spending: 1150000 }
+                        { pr: "PR-2028-004", dealStart: "2028/01/20", dealEnd: null, item: "HPC Processing Server Nodes for Simulation Farm", budget: 1200000, demand: 1200000, spending: 1150000 }
                     ],
                     "Synopsys_Maint": [
-                        { period: "2028 H1-H2", item: "Synopsys Hardware Maintenance Contract", budget: 600000, demand: 590000, spending: 580000 }
+                        { pr: "PR-2028-005", dealStart: "2028/01/01", dealEnd: "2028/12/31", item: "Synopsys Hardware Maintenance Contract", budget: 600000, demand: 590000, spending: 580000 }
                     ],
                     "Cadence_SW": [
-                        { period: "2028 Q1", item: "Digital Design Platform Subscription", budget: 3000000, demand: 3000000, spending: 2950000 },
-                        { period: "2028 Q2", item: "Spectre Verification Suite Expansion", budget: 1200000, demand: 1300000, spending: 1200000 },
-                        { period: "2028 Q3", item: "Cerebrus AI Optimization Tool Suite", budget: 800000, demand: 800000, spending: 750000 }
+                        { pr: "PR-2028-006", dealStart: "2028/01/01", dealEnd: "2028/03/31", item: "Digital Design Platform Subscription", budget: 3000000, demand: 3000000, spending: 2950000 },
+                        { pr: "PR-2028-007", dealStart: "2028/04/01", dealEnd: "2028/06/30", item: "Spectre Verification Suite Expansion", budget: 1200000, demand: 1300000, spending: 1200000 },
+                        { pr: "PR-2028-008", dealStart: "2028/07/01", dealEnd: "2028/09/30", item: "Cerebrus AI Optimization Tool Suite", budget: 800000, demand: 800000, spending: 750000 }
                     ],
                     "Cadence_HW": [
-                        { period: "2028 Q1-Emergency", item: "Palladium Emulation System Expansion", budget: 100000, demand: 180000, spending: 170000 },
-                        { period: "2028 Q3-Emergency", item: "Protium S1 Hardware Core Integration", budget: 50000, demand: 120000, spending: 120000 } 
+                        { pr: "PR-2028-009", dealStart: "2028/02/15", dealEnd: null, item: "Palladium Emulation System Expansion", budget: 100000, demand: 180000, spending: 170000 },
+                        { pr: "PR-2028-010", dealStart: "2028/08/10", dealEnd: null, item: "Protium S1 Hardware Core Integration", budget: 50000, demand: 120000, spending: 120000 }
                     ],
                     "Siemens_SW": [
-                        { period: "2028 H1", item: "Calibre Physical Verification Maintenance", budget: 1800000, demand: 1800000, spending: 1750000 },
-                        { period: "2028 H2", item: "Tessent Test Suite Floating Licenses", budget: 600000, demand: 600000, spending: 550000 }
+                        { pr: "PR-2028-011", dealStart: "2028/01/01", dealEnd: "2028/06/30", item: "Calibre Physical Verification Maintenance", budget: 1800000, demand: 1800000, spending: 1750000 },
+                        { pr: "PR-2028-012", dealStart: "2028/07/01", dealEnd: "2028/12/31", item: "Tessent Test Suite Floating Licenses", budget: 600000, demand: 600000, spending: 550000 }
                     ],
                     "Ansys_SW": [
-                        { period: "2028 Full-Year", item: "RedHawk-SC Power Integrity Licenses", budget: 1000000, demand: 1000000, spending: 960000 }
+                        { pr: "PR-2028-013", dealStart: "2028/01/01", dealEnd: "2028/12/31", item: "RedHawk-SC Power Integrity Licenses", budget: 1000000, demand: 1000000, spending: 960000 }
                     ],
                     "Keysight_SW": [
-                        { period: "2028 Q1-Emergency", item: "High-Freq Analyzer Calibration Maintenance", budget: 100000, demand: 140000, spending: 130000 }
+                        { pr: "PR-2028-014", dealStart: "2028/01/20", dealEnd: "2028/03/31", item: "High-Freq Analyzer Calibration Maintenance", budget: 100000, demand: 140000, spending: 130000 }
                     ]
                 }
             }
@@ -649,11 +685,22 @@
                 }
             }
 
+            // 曝險評級 (Risk Score) 計算前置作業：取得本清單 Borrow Rate % 與 Temp key cost 的最小/最大值，供 Min-Max 正規化使用
+            var minCost = null, maxCost = null, maxRate = 0;
+            for (var c = 0; c < data.length; c++) {
+                var rate = (data[c].tempQty / data[c].formalQty) * 100;
+                if (rate > maxRate) maxRate = rate;
+                if (minCost === null || data[c].cost < minCost) minCost = data[c].cost;
+                if (maxCost === null || data[c].cost > maxCost) maxCost = data[c].cost;
+            }
+            // Borrow Rate 以 100% 為正規化上限（超過 100% 視為滿分），若清單內無人超過 100% 則以清單內最大值為上限，避免分數被稀釋
+            var rateNormCap = Math.max(maxRate, 100);
+
             var tbody = document.getElementById('temp-key-detail-rows');
             if (tbody) {
                 tbody.innerHTML = '';
                 if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" class="py-8 text-center text-slate-400">當年度無臨時授權狀態數據</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="11" class="py-8 text-center text-slate-400">當年度無臨時授權狀態數據</td></tr>';
                 } else {
                     for (var r = 0; r < data.length; r++) {
                         var item = data[r];
@@ -668,6 +715,20 @@
                             riskBadge = '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">Sufficient</span>';
                         }
 
+                        // 曝險評級 (Risk Score)：Borrow Rate % 與 Temp key cost 正規化後加權平均 (SAW / Weighted Sum Model)，各佔 50%
+                        var normRate = rateNormCap > 0 ? Math.min((parseFloat(borrowRate) / rateNormCap) * 100, 100) : 0;
+                        var normCost = (maxCost === minCost) ? 50 : ((item.cost - minCost) / (maxCost - minCost)) * 100;
+                        var riskScore = Math.round(0.5 * normRate + 0.5 * normCost);
+
+                        var scoreBadge = '';
+                        if (riskScore >= 70) {
+                            scoreBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">高風險 (${riskScore})</span>`;
+                        } else if (riskScore >= 40) {
+                            scoreBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-800">中風險 (${riskScore})</span>`;
+                        } else {
+                            scoreBadge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700">低風險 (${riskScore})</span>`;
+                        }
+
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-50 transition">
                                 <td class="py-4 px-6 text-center">${riskBadge}</td>
@@ -680,6 +741,7 @@
                                 <td class="py-4 px-6 text-slate-500">${item.function}</td>
                                 <td class="py-4 px-6 font-bold text-slate-700">${item.tml}</td>
                                 <td class="py-4 px-6 text-right font-mono font-bold text-slate-900">$${item.cost.toLocaleString()}</td>
+                                <td class="py-4 px-6 text-center">${scoreBadge}</td>
                             </tr>
                         `;
                     }
@@ -755,26 +817,42 @@
                 yearSpans[i].innerText = state.filterYear;
             }
 
+            // 依據該項目類型決定 Deal Period 顯示方式：硬體僅顯示開始日期，軟體／維護顯示「開始日期－結束日期」
+            var itemTypeC = '';
+            var activeYearVendorsC = yearlyData[state.filterYear].vendors;
+            for (var vc = 0; vc < activeYearVendorsC.length; vc++) {
+                if (activeYearVendorsC[vc].id === vendorId) {
+                    itemTypeC = activeYearVendorsC[vc].type;
+                    break;
+                }
+            }
+            var isHardwareC = (itemTypeC === 'Hardware');
+
             var data = yearlyData[state.filterYear].spendBreakdown[vendorId] || [];
             var tbody = document.getElementById('spend-detail-rows');
             if (tbody) {
                 tbody.innerHTML = '';
                 if (data.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="6" class="py-8 text-center text-slate-400">當年度無細項預算數據</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="7" class="py-8 text-center text-slate-400">當年度無細項預算數據</td></tr>';
                 } else {
                     for (var r = 0; r < data.length; r++) {
                         var item = data[r];
-                        var rateText = item.budget > 0 
-                            ? Math.round((item.spending / item.budget) * 100) + '%' 
+                        var rateText = item.budget > 0
+                            ? Math.round((item.spending / item.budget) * 100) + '%'
                             : '無預算額度 (N/A)';
-                        var rateStyle = item.budget > 0 
-                            ? (item.spending > item.budget ? 'text-rose-600 font-bold' : 'text-slate-600') 
+                        var rateStyle = item.budget > 0
+                            ? (item.spending > item.budget ? 'text-rose-600 font-bold' : 'text-slate-600')
                             : 'text-amber-600 font-semibold';
+
+                        var dealPeriodText = isHardwareC
+                            ? item.dealStart
+                            : (item.dealStart + ' － ' + item.dealEnd);
 
                         tbody.innerHTML += `
                             <tr class="hover:bg-slate-50 transition">
-                                <td class="py-4 px-6 font-semibold text-slate-700">${item.period}</td>
+                                <td class="py-4 px-6 font-semibold text-slate-700 font-mono">${dealPeriodText}</td>
                                 <td class="py-4 px-6 text-slate-800 font-medium">${item.item}</td>
+                                <td class="py-4 px-6 text-slate-500 font-mono">${item.pr}</td>
                                 <td class="py-4 px-6 text-right font-mono text-slate-600">$${item.demand.toLocaleString()}</td>
                                 <td class="py-4 px-6 text-right font-mono">$${item.budget.toLocaleString()}</td>
                                 <td class="py-4 px-6 text-right font-mono text-slate-900 font-semibold">$${item.spending.toLocaleString()}</td>
@@ -807,9 +885,29 @@
                 yearSpans[i].innerText = state.filterYear;
             }
 
+            // 依據點選項目的類型，動態決定標題中文字樣（軟體／硬體／維護）與 At Risk 門檻天數
+            var itemType = '';
+            var activeYearVendors = yearlyData[state.filterYear].vendors;
+            for (var v = 0; v < activeYearVendors.length; v++) {
+                if (activeYearVendors[v].id === vendorId) {
+                    itemType = activeYearVendors[v].type;
+                    break;
+                }
+            }
+            var typeLabelZh = getTypeLabelZh(itemType);
+            var threshold = getLeadTimeThreshold(itemType);
+
+            var typeLabelEl = document.getElementById('level2d-type-label');
+            if (typeLabelEl) typeLabelEl.innerText = '（' + typeLabelZh + '）';
+
+            var descEl = document.getElementById('level2d-lead-time-desc');
+            if (descEl) {
+                descEl.innerHTML = '採購 Lead Time ＝ 專案需求日期 － 確認採購需求日期。若前置天數小於 <span class="font-bold text-rose-600">' + threshold + ' 天</span>，系統將自動判定標示為「At Risk」。';
+            }
+
             var data = yearlyData[state.filterYear].fulfillmentRisk[vendorId] || [];
             var tbody = document.getElementById('risk-detail-rows');
-            
+
             if (tbody) {
                 tbody.innerHTML = '';
                 if (data.length === 0) {
@@ -818,10 +916,10 @@
                     for (var r = 0; r < data.length; r++) {
                         var item = data[r];
                         var leadTime = getDaysDiff(item.confirmDate, item.targetDate);
-                        
-                        // 微調：常態改為 On Track，有風險改為 At Risk
+
+                        // 依據該項目類型的門檻天數判定：常態為 On Track，有風險為 At Risk
                         var riskLabel = '';
-                        if (leadTime < 60) {
+                        if (leadTime < threshold) {
                             riskLabel = `
                                 <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800">
                                     <span class="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse-red mr-1"></span>At Risk
@@ -840,7 +938,7 @@
                                 <td class="py-4 px-6 text-slate-600">${item.bu}</td>
                                 <td class="py-4 px-6 font-bold text-slate-700">${item.tml}</td>
                                 <td class="py-4 px-6 text-slate-600">${item.project}</td>
-                                <td class="py-4 px-6 text-center font-mono font-bold ${leadTime < 60 ? 'text-rose-600' : 'text-slate-700'}">${leadTime} 天</td>
+                                <td class="py-4 px-6 text-center font-mono font-bold ${leadTime < threshold ? 'text-rose-600' : 'text-slate-700'}">${leadTime} 天</td>
                                 <td class="py-4 px-6 font-mono text-slate-600">${item.confirmDate}</td>
                                 <td class="py-4 px-6 font-mono text-slate-600">${item.targetDate}</td>
                                 <td class="py-4 px-6 font-mono text-slate-600">${item.verifyDate}</td>
@@ -977,15 +1075,16 @@
                         var demandCellHtml = `<td class="py-4 px-6 text-right font-mono text-blue-600 hover:underline cursor-pointer" onclick="window.showLevel2C('${item.id}', '需求')">$${item.demand.toLocaleString()} ↗</td>`;
                         var spendingCellHtml = `<td class="py-4 px-6 text-right font-mono text-blue-600 hover:underline cursor-pointer" onclick="window.showLevel2C('${item.id}', '實際花費')">$${item.spending.toLocaleString()} ↗</td>`;
                         
-                        // 採購履行風險 (已全面英文化)
+                        // 採購履行風險 (適用於軟體／硬體／維護，門檻依類型而異)
                         var riskCellHtml = '<td class="py-4 px-6 text-center text-slate-400">-</td>';
-                        if (item.type === 'Hardware') {
-                            var details = activeYearData.fulfillmentRisk[item.id] || [];
+                        var details = activeYearData.fulfillmentRisk[item.id] || [];
+                        if (details.length > 0) {
+                            var riskThreshold = getLeadTimeThreshold(item.type);
                             var hasRisk = false;
                             for (var h = 0; h < details.length; h++) {
                                 var prod = details[h];
                                 var diff = getDaysDiff(prod.confirmDate, prod.targetDate);
-                                if (diff < 60) {
+                                if (diff < riskThreshold) {
                                     hasRisk = true;
                                     break;
                                 }
